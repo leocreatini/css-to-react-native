@@ -6,11 +6,25 @@ const TokenStream = require('./TokenStream');
 
 // Note if this is wrong, you'll need to change tokenTypes.js too
 const numberOrLengthRe = /^([+-]?(?:\d*\.)?\d+(?:[Ee][+-]?\d+)?)(?:px)?$/i;
+const remOrEmRe = /(\.?[\d]+(\.([\d]+)?)?)(?:r?em)/i;
+const remFinderRe = /((\.?[\d]+)(\.([\d]+)?)?(?:r?em)+)/gi;
 const boolRe = /^true|false$/i;
+
+// TODO - need to pull in config
+const BASE_SIZE = 16;
+
+const convertRemToPx = (value) => `${remOrEmRe.exec(value)[1] * BASE_SIZE}px`;
+const convertAllRemToPx = (accum, match) => {
+  return accum.replace(remOrEmRe, convertRemToPx(accum));
+};
 
 // Undocumented export
 export const transformRawValue = (input) => {
-  const value = input.trim();
+  const initialValue = input.trim();
+  const remMatches = initialValue.match(remFinderRe);
+  const value = (remMatches)
+    ? remMatches.reduce(convertAllRemToPx, initialValue)
+    : initialValue;
 
   const numberMatch = value.match(numberOrLengthRe);
   if (numberMatch !== null) return Number(numberMatch[1]);
@@ -50,9 +64,13 @@ export const getStylesForProperty = (propName, inputValue, allowShorthand) => {
 
 export const getPropertyName = camelizeStyleName;
 
-export default (rules, shorthandBlacklist = []) => rules.reduce((accum, rule) => {
-  const propertyName = getPropertyName(rule[0]);
-  const value = rule[1];
-  const allowShorthand = shorthandBlacklist.indexOf(propertyName) === -1;
-  return Object.assign(accum, getStylesForProperty(propertyName, value, allowShorthand));
-}, {});
+export default (rules, shorthandBlacklist = []) =>
+  rules.reduce((accum, rule) => {
+    const propertyName = getPropertyName(rule[0]);
+    const value = rule[1];
+    const allowShorthand = shorthandBlacklist.indexOf(propertyName) === -1;
+    return Object.assign(
+      accum,
+      getStylesForProperty(propertyName, value, allowShorthand)
+    );
+  }, {});
